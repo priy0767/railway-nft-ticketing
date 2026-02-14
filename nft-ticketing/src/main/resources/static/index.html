@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Railway NFT Ticketing</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .hero { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: white; padding: 40px 0; margin-bottom: 30px; }
+        .card { border: none; shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 12px; }
+        .btn-primary { background-color: #007bff; border: none; padding: 12px; font-weight: bold; width: 100%; }
+        .btn-primary:hover { background-color: #0056b3; }
+        .result-box { display: none; margin-top: 15px; padding: 15px; border-radius: 8px; font-weight: 500; word-wrap: break-word; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; margin-right: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="hero text-center">
+    <h1>🚆 Railway NFT Ticketing</h1>
+    <p>Decentralized & Unforgeable Tickets on Polygon</p>
+</div>
+
+<div class="container">
+    <div class="row justify-content-center">
+
+        <div class="col-md-5 mb-4">
+            <div class="card p-4 shadow-sm">
+                <h4 class="mb-3">🎫 Book Ticket</h4>
+                <form id="bookingForm">
+                    <div class="mb-3">
+                        <label class="form-label">Passenger Name</label>
+                        <input type="text" name="passengerName" class="form-control" placeholder="e.g. Rahul Kumar" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Train ID</label>
+                        <input type="text" name="trainId" class="form-control" placeholder="e.g. Express-123" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" name="date" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Seat Number</label>
+                        <input type="text" name="seatNumber" class="form-control" placeholder="e.g. A1" required>
+                    </div>
+                    <button type="submit" id="mintBtn" class="btn btn-primary">Mint Ticket Now</button>
+                </form>
+
+                <div id="bookingResult" class="result-box"></div>
+            </div>
+        </div>
+
+        <div class="col-md-5">
+            <div class="card p-4 shadow-sm">
+                <h4 class="mb-3">✅ Verify Ticket</h4>
+                <p class="text-muted">Enter Ticket ID to check validity on Blockchain.</p>
+
+                <div class="input-group mb-3">
+                    <input type="number" id="ticketIdInput" class="form-control" placeholder="Ticket ID (e.g. 0)">
+                    <button class="btn btn-dark" onclick="verifyTicket()">Check</button>
+                </div>
+
+                <div id="verifyResult" class="result-box"></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // 1. Handle Booking (Minting)
+    document.getElementById("bookingForm").addEventListener("submit", async function(e) {
+        e.preventDefault(); // Stop page reload
+
+        const btn = document.getElementById("mintBtn");
+        const statusBox = document.getElementById("bookingResult");
+
+        // Disable button and show loading
+        btn.disabled = true;
+        btn.innerHTML = '<div class="loader"></div> Minting... (Wait 10s)';
+        statusBox.style.display = "none";
+
+        // Gather Data
+        const formData = new FormData(this);
+        const params = new URLSearchParams(formData);
+
+        try {
+            // Call Java Backend
+            const response = await fetch("/api/tickets/book?" + params.toString(), { method: "POST" });
+            const txHash = await response.text();
+
+            statusBox.style.display = "block";
+
+            // If response starts with "Error", show Red Box. Else Green.
+            if (txHash.includes("Error") || txHash.includes("Exception")) {
+                statusBox.className = "result-box alert alert-danger";
+                statusBox.innerHTML = "❌ <strong>Minting Failed:</strong><br>" + txHash;
+            } else {
+                statusBox.className = "result-box alert alert-success";
+                statusBox.innerHTML = "🎉 <strong>Ticket Booked!</strong><br><small>Tx Hash: " + txHash + "</small>";
+                console.log("Success Hash:", txHash);
+            }
+        } catch (error) {
+            statusBox.style.display = "block";
+            statusBox.className = "result-box alert alert-danger";
+            statusBox.innerText = "❌ Connection Error: Is the Java Server running?";
+            console.error(error);
+        }
+
+        // Reset Button
+        btn.disabled = false;
+        btn.innerText = "Mint Ticket Now";
+    });
+
+    // 2. Handle Verification
+    async function verifyTicket() {
+        const id = document.getElementById("ticketIdInput").value;
+        const resultBox = document.getElementById("verifyResult");
+
+        resultBox.style.display = "none";
+
+        if (id === "") {
+            alert("Please enter a Ticket ID");
+            return;
+        }
+
+        resultBox.style.display = "block";
+        resultBox.className = "result-box alert alert-info";
+        resultBox.innerText = "🔍 Checking Blockchain...";
+
+        try {
+            const response = await fetch("/api/tickets/verify/" + id);
+            const message = await response.text();
+
+            // If message has "✅", turn Green. Else Red.
+            if (message.includes("✅")) {
+                resultBox.className = "result-box alert alert-success";
+                resultBox.style.backgroundColor = "#d4edda";
+                resultBox.style.color = "#155724";
+            } else {
+                resultBox.className = "result-box alert alert-danger";
+                resultBox.style.backgroundColor = "#f8d7da";
+                resultBox.style.color = "#721c24";
+            }
+            resultBox.innerText = message;
+
+        } catch (error) {
+            resultBox.className = "result-box alert alert-danger";
+            resultBox.innerText = "❌ Network Error: Backend is unreachable.";
+        }
+    }
+</script>
+
+</body>
+</html>
